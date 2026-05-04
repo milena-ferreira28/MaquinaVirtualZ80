@@ -11,6 +11,7 @@ package maquinavirtualz80;
 public class CPU {
     public Memory memory;
     public Registers registers;
+    public Stack stack;
     
     public Memory getMemory() {
     return memory;
@@ -26,6 +27,7 @@ public class CPU {
     public CPU() {
         memory = new Memory();
         registers = new Registers();
+        stack = new Stack(memory, registers);
         halted = false;
         
         registers.SP = 0xFFFE;
@@ -49,6 +51,7 @@ public class CPU {
     registers.PC++;
 
     // DEBUG (opcional, ajuda MUITO)
+    System.out.println("PC: " + registers.PC);
     System.out.println("Executando opcode: " + Integer.toHexString(opcode));
 
     // EXECUTE
@@ -71,7 +74,20 @@ public class CPU {
             registers.flags.setSign((registers.A & 0X80) != 0);
             break;
             
-        //====================================================              
+        //====================================================  
+        case 0x06: // LD B, n
+            int valueB = memory.read(registers.PC);
+            registers.PC++;
+
+            registers.B = valueB;
+
+            // FLAGS (opcional — normalmente LD não altera, mas pode deixar)
+            registers.flags.setZero(registers.B == 0);
+            registers.flags.setSign((registers.B & 0x80) != 0);
+
+            break;
+            
+        //====================================================             
         case 0x3C: // INC A
             registers.A = (registers.A + 1) & 0xFF;
             // FLAGS
@@ -111,7 +127,23 @@ public class CPU {
             
             break;
 
-        //====================================================  
+        //==================================================== 
+        case 0x80: // ADD A, B
+            int resultAB = registers.A + registers.B;
+
+            // Carry
+            registers.flags.setCarry(resultAB > 0xFF);
+
+            // Mantém 8 bits
+            registers.A = resultAB & 0xFF;
+
+            // Flags
+            registers.flags.setZero(registers.A == 0);
+            registers.flags.setSign((registers.A & 0x80) != 0);
+
+            break;
+            
+        //==================================================== 
         case 0xD6: // SUB A, n
             int valueSub = memory.read(registers.PC);
             registers.PC++;
@@ -220,34 +252,42 @@ public class CPU {
             int highCall = memory.read(registers.PC);
             registers.PC++;
             
-            int adressCall = (highCall << 8) | lowCall;
+            int addressCall = (highCall << 8) | lowCall;
             
-            //empilha o pc atual
-            registers.SP--;
-            memory.write(registers.SP, (registers.PC >> 8) & 0xFF); //HIGH
-            
-            registers.SP--;
-            memory.write(registers.SP, registers.PC & 0xFF); //low
-            
-            //salta
-            registers.PC = adressCall;
+            stack.push16(registers.PC);
+            registers.PC = addressCall;
             
             break;
             
         //==================================================== 
         case 0xC9: // RET
-        int lowRet = memory.read(registers.SP);
-        registers.SP++;
-
-        int highRet = memory.read(registers.SP);
-        registers.SP++;
-
-        int returnAddress = (highRet << 8) | lowRet;
-
-        registers.PC = returnAddress;
-
+        registers.PC = stack.pop16();
         break;
         
+        //====================================================
+        case 0xC5: //PUSH BC
+            //empilha HIGH primeiro (B)
+            registers.SP--;
+            memory.write(registers.SP, registers.B);
+            
+            //depois LOW (C)
+            registers.SP--;
+            memory.write(registers.SP, registers.C);
+            
+            break;
+            
+        //====================================================
+        case 0xC1: //POP BC
+            //lÊ LOW primeior
+            registers.C = memory.read(registers.SP);
+            registers.SP++;
+            
+            //depois HIGH
+            registers.B = memory.read(registers.SP);
+            registers.SP++;
+            
+            break;
+
         //====================================================
         default:
             System.out.println("Opcode não implementado: " + Integer.toHexString(opcode));

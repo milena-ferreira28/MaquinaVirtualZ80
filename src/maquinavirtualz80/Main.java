@@ -11,7 +11,10 @@ package maquinavirtualz80;
 public class Main {
 
     public static void main(String[] args) {
-
+        
+        CPU cpu = new CPU();
+        new GUI(cpu);
+        /*
         // =========================
         // TESTE 1 — MEMÓRIA
         // =========================
@@ -304,7 +307,6 @@ public class Main {
 
         System.out.println("\nTESTE 16 — JR forward:");
         System.out.println("A = " + cpu12.getRegisters().A);
-        
         // ============================
         // TESTE 17 - CALL + RET
         // ============================    
@@ -330,5 +332,74 @@ public class Main {
         System.out.println("\nTESTE 17 — CALL + RET:");
         System.out.println("A = " + cpu13.getRegisters().A);
         
+        // =========================
+        // TESTE 18 — PUSH BC
+        // =========================
+        CPU cpu14 = new CPU();
+
+        cpu14.getRegisters().B = 0x12;
+        cpu14.getRegisters().C = 0x34;
+
+        cpu14.getMemory().write(0, 0xC5); // PUSH BC
+        cpu14.getMemory().write(1, 0x76); // HALT
+
+        cpu14.run();
+
+        System.out.println("\nTESTE 18 — PUSH BC:");
+        System.out.println("SP = " + Integer.toHexString(cpu14.getRegisters().SP));
+        
+        // =========================
+        // TESTE 19 — POP BC
+        // =========================
+        CPU cpu15 = new CPU();
+
+        // simula um PUSH manual
+        cpu15.getRegisters().SP = 0xFFFE;
+
+        cpu15.getMemory().write(0xFFFD, 0x12); // B (high)
+        cpu15.getMemory().write(0xFFFC, 0x34); // C (low)
+
+        cpu15.getRegisters().SP = 0xFFFC;
+
+        cpu15.getMemory().write(0, 0xC1); // POP BC
+        cpu15.getMemory().write(1, 0x76); // HALT
+
+        cpu15.run();
+
+        System.out.println("\nTESTE 29 — POP BC:");
+        System.out.println("B = " + Integer.toHexString(cpu15.getRegisters().B));
+        System.out.println("C = " + Integer.toHexString(cpu15.getRegisters().C));
+        
+        // =========================
+        // TESTE 20 — PUSH + POP
+        // =========================
+        CPU cpu16 = new CPU();
+
+        cpu16.getRegisters().B = 0xAA;
+        cpu16.getRegisters().C = 0xBB;
+
+        cpu16.getMemory().write(0, 0xC5); // PUSH BC
+        cpu16.getMemory().write(1, 0xC1); // POP BC
+        cpu16.getMemory().write(2, 0x76); // HALT
+
+        cpu16.run();
+
+        System.out.println("\nTESTE 20 — PUSH + POP:");
+        System.out.println("B = " + Integer.toHexString(cpu16.getRegisters().B));
+        System.out.println("C = " + Integer.toHexString(cpu16.getRegisters().C));
+    
+        // ============================
+        // TESTE 21 — Program Loader
+        // ============================
+        CPU cpu17 = new CPU();
+
+        // CAMINHO DO ARQUIVO (ajusta pro teu PC)
+        ProgramLoader.load("/maquinavirtualz80/programa.txt", cpu17.getMemory());
+
+        cpu17.run();
+
+        System.out.println("\nTESTE 21 — LOADER:");
+        System.out.println("A = " + cpu17.getRegisters().A);
+*/
     }
 }

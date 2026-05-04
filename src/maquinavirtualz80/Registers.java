@@ -29,7 +29,7 @@ public class Registers {
     
     //Resetar todos os registradores
     public void reset() {
-        A = B = C = D = E= H = L = 0;
+        A = B = C = D = E = H = L = 0;
         PC = 0;
         SP = 0;
         IX = 0;
