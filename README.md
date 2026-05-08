@@ -154,7 +154,10 @@ Simular o funcionamento básico de uma CPU baseada no Z80, permitindo a execuç�
 ---
 
 ## 👩‍💻 Autores
-
+Gabriel Mendes
+Guilherme Gonçalves Pereira
+Iago Kainan Bubolz Braatz
+Lincon Thiel Retzlaff
 Milena Alves Ferreira
-
+Vitor Teixeira Medina
 ---
