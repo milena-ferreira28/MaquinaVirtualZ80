@@ -4,6 +4,7 @@ import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
 import java.io.File;
+import maquinavirtualz80.assembler.Assembler;  // NOVO - import do assembler
 
 public class GUI extends JFrame {
 
@@ -14,12 +15,15 @@ public class GUI extends JFrame {
     // Labels
     private JLabel labelRegs, labelFlags, labelPC, labelOpcode, labelStatus;
     private JTextArea memoryArea, stackArea;
+    
+    // NOVO - Para mostrar mensagens do assembler
+    private JTextArea consoleArea;
 
     public GUI(CPU cpu) {
         this.cpu = cpu;
 
-        setTitle("Z80 Virtual Machine");
-        setSize(800, 600);
+        setTitle("Z80 Virtual Machine - Com Montador");
+        setSize(900, 700);  // MODIFICADO - aumentado para caber o console
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         // =========================
@@ -88,16 +92,18 @@ public class GUI extends JFrame {
         mainPanel.add(centerPanel, BorderLayout.CENTER);
 
         // =========================
-        // BOTÕES (embaixo)
+        // BOTÕES (em cima) - MODIFICADO
         // =========================
         JPanel buttonPanel = new JPanel();
         buttonPanel.setOpaque(false);
 
+        JButton btnAssemble = new JButton("MONTAR");  // NOVO
         JButton btnStep = new JButton("STEP");
         JButton btnRun = new JButton("RUN");
         JButton btnReset = new JButton("RESET");
         JButton btnLoad = new JButton("LOAD");
 
+        buttonPanel.add(btnAssemble);  // NOVO - adicionado primeiro
         buttonPanel.add(btnStep);
         buttonPanel.add(btnRun);
         buttonPanel.add(btnReset);
@@ -105,51 +111,145 @@ public class GUI extends JFrame {
 
         mainPanel.add(buttonPanel, BorderLayout.SOUTH);
 
+consoleArea = new JTextArea();
+consoleArea.setFont(new Font("Monospaced", Font.PLAIN, 11));
+consoleArea.setEditable(false);
+consoleArea.setBackground(new Color(255, 243, 204));
+consoleArea.setForeground(Color.BLACK);
+consoleArea.setText("=== Console da Máquina Virtual Z80 ===\nAguardando comandos...\n");
+        
+        JScrollPane consoleScroll = new JScrollPane(consoleArea);
+        consoleScroll.setBorder(createTitledBorder("CONSOLE"));
+        consoleScroll.setPreferredSize(new Dimension(880, 120));
+        
+        mainPanel.add(consoleScroll, BorderLayout.NORTH);
+
         // =========================
         // AÇÕES
         // =========================
 
-        btnStep.addActionListener(e -> {
-            if (!programLoaded) return;
+        // MONTAR
+        btnAssemble.addActionListener(e -> {
+            JFileChooser chooser = new JFileChooser(new File("."));
+            chooser.setDialogTitle("Selecione o arquivo Assembly (.asm)");
             
+            // Filtro para arquivos .asm
+            chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Arquivos Assembly (*.asm)", "asm"));
+            
+            int result = chooser.showOpenDialog(this);
+
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File asmFile = chooser.getSelectedFile();
+                String objFile = asmFile.getAbsolutePath().replace(".asm", ".obj");
+                
+                consoleArea.append("\n[Montador] Iniciando montagem de: " + asmFile.getName() + "\n");
+                
+                Assembler assembler = new Assembler();
+                boolean success = assembler.assemble(asmFile.getAbsolutePath(), objFile);
+                
+                if (success) {
+                    consoleArea.append("[Montador] Montagem concluída com sucesso!\n");
+                    consoleArea.append("[Montador] Arquivo gerado: " + objFile + "\n");
+                    
+                    // Carrega automaticamente o arquivo montado
+                    consoleArea.append("[Loader] Carregando programa na memória...\n");
+                    ProgramLoader.load(objFile, cpu.getMemory());
+                    cpu.getRegisters().PC = 0;
+                    cpu.halted = false;
+                    programLoaded = true;
+                    
+                    consoleArea.append("[Loader] Programa carregado! PC = 0x0000\n");
+                    consoleArea.append("[Sistema] Pronto para execução. Use STEP ou RUN.\n");
+                    
+                    updateDisplay();
+                } else {
+                    consoleArea.append("[Montador] Erro na montagem:\n");
+                    consoleArea.append(assembler.getErrors() + "\n");
+                    JOptionPane.showMessageDialog(this, "Erro na montagem! Verifique o console para detalhes.");
+                }
+            }
+        });
+
+        btnStep.addActionListener(e -> {
+            if (!programLoaded) {
+                consoleArea.append("[Aviso] Nenhum programa carregado. Use LOAD ou MONTAR primeiro.\n");
+                return;
+            }
+            
+            if (cpu.halted) {
+                consoleArea.append("[Aviso] CPU está parada (HALT). Use RESET para reiniciar.\n");
+                return;
+            }
+            
+            consoleArea.append("[STEP] Executando instrução em PC = " + hex16(cpu.getRegisters().PC) + "\n");
             this.cpu.step();
             updateDisplay();
+            
+            if (cpu.halted) {
+                consoleArea.append("[Sistema] Programa finalizado (HALT)\n");
+            }
         });
 
         btnRun.addActionListener(e -> {
-            if (!programLoaded) return;
+            if (!programLoaded) {
+                consoleArea.append("[Aviso] Nenhum programa carregado. Use LOAD ou MONTAR primeiro.\n");
+                return;
+            }
+            
+            if (cpu.halted) {
+                consoleArea.append("[Aviso] CPU está parada (HALT). Use RESET para reiniciar.\n");
+                return;
+            }
+            
+            consoleArea.append("[RUN] Executando programa...\n");
             
             new Thread(() -> {
+                int steps = 0;
                 while (!cpu.halted) {
                     cpu.step();
+                    steps++;
 
                     try {
-                        Thread.sleep(200); // velocidade
+                        Thread.sleep(100); // velocidade ajustada
                     } catch (InterruptedException ex) {}
 
-                    SwingUtilities.invokeLater(() -> updateDisplay());
+                    final int currentSteps = steps;
+                    SwingUtilities.invokeLater(() -> {
+                        updateDisplay();
+                        if (cpu.halted) {
+                            consoleArea.append("[RUN] Programa finalizado após " + currentSteps + " instruções (HALT)\n");
+                        }
+                    });
                 }
             }).start();
         });
 
         btnReset.addActionListener(e -> {
             this.cpu = new CPU();
+            programLoaded = false;  // Reset também limpa o flag de programa carregado
+            consoleArea.append("[Reset] CPU reiniciada. Registradores zerados.\n");
             updateDisplay();
         });
 
         btnLoad.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser(new File("."));
+            chooser.setDialogTitle("Selecione o arquivo objeto (.obj)");
+            
+            // Filtro para arquivos .obj e .txt
+            chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Arquivos Objeto (*.obj, *.txt)", "obj", "txt"));
+            
             int result = chooser.showOpenDialog(this);
 
             if (result == JFileChooser.APPROVE_OPTION) {
                 File file = chooser.getSelectedFile();
-                System.out.println("Arquivo selecionado: " + file.getAbsolutePath());
+                consoleArea.append("[Loader] Carregando arquivo: " + file.getName() + "\n");
                 ProgramLoader.load(file.getAbsolutePath(), this.cpu.getMemory());
                 this.cpu.getRegisters().PC = 0;
                 this.cpu.halted = false;
                 
                 programLoaded = true;
                 
+                consoleArea.append("[Loader] ✅ Programa carregado! Tamanho: verificar memória\n");
                 updateDisplay();
             }
         });
@@ -188,7 +288,6 @@ public class GUI extends JFrame {
         Registers r = cpu.getRegisters();
         
         if (!programLoaded) {
-
             labelOpcode.setText("Opcode atual: (sem programa)");
             labelStatus.setText("STATUS: AGUARDANDO LOAD");
 
@@ -201,9 +300,14 @@ public class GUI extends JFrame {
                 "SP: " + hex16(r.SP) +
                 "</html>"
             );
+            
+            // Limpa memória e stack se não há programa
+            memoryArea.setText("(Nenhum programa carregado)");
+            stackArea.setText("(Nenhum programa carregado)");
 
-            return; // 👈 SAI DO MÉTODO AQUI
+            return;
         } 
+        
         // REGISTRADORES
         labelRegs.setText(
                 "<html>" +
@@ -237,14 +341,12 @@ public class GUI extends JFrame {
             labelOpcode.setText("Opcode atual: --");
         }
 
-        labelStatus.setText("STATUS: " + (cpu.halted ? "HALTED" : "IDLE"));
+        labelStatus.setText("STATUS: " + (cpu.halted ? "HALTED" : "RUNNING"));
 
-        // MEMÓRIA (20 posições)
+        // MEMÓRIA (primeiros 20 bytes)
         StringBuilder mem = new StringBuilder();
         for (int i = 0; i < 20; i++) {
-            if (i >= 0 && i < 6553) {
-                mem.append(String.format("%04X: %02X\n", i, cpu.getMemory().read(i)));
-            }
+            mem.append(String.format("%04X: %02X\n", i, cpu.getMemory().read(i)));
         }
         memoryArea.setText(mem.toString());
 
@@ -254,7 +356,7 @@ public class GUI extends JFrame {
         for (int i = 0; i < 10; i++) {
             int addr = sp + i;
             if(addr >= 0 && addr < 65536) {
-            stack.append(String.format("%04X: %02X\n", addr, cpu.getMemory().read(addr)));
+                stack.append(String.format("%04X: %02X\n", addr, cpu.getMemory().read(addr)));
             }
         }
         stackArea.setText(stack.toString());
