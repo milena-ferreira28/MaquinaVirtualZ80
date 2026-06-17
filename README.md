@@ -239,7 +239,3 @@ Este projeto foi desenvolvido para fins educacionais, com o intuito de:
 **Lincon Thiel Retzlaff**
 **Milena Alves Ferreira**
 **Vitor Teixeira Medina**
-
----
-
-⭐ Se este projeto te ajudou, considere dar uma estrela no repositório!
