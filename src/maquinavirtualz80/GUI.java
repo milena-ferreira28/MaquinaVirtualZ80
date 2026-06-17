@@ -8,28 +8,42 @@ import java.io.File;
 public class GUI extends JFrame {
 
     private CPU cpu;
-    
     private boolean programLoaded = false;
 
     // Labels
     private JLabel labelRegs, labelFlags, labelPC, labelOpcode, labelStatus;
     private JTextArea memoryArea, stackArea;
+    private JTextArea consoleArea;
 
     public GUI(CPU cpu) {
         this.cpu = cpu;
 
         setTitle("Z80 Virtual Machine");
-        setSize(800, 600);
+        setSize(900, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         // =========================
         // PAINEL PRINCIPAL (FUNDO)
         // =========================
         JPanel mainPanel = new JPanel(new BorderLayout());
-        mainPanel.setBackground(new Color(255, 243, 204)); // amarelo claro
+        mainPanel.setBackground(new Color(255, 243, 204));
         mainPanel.setBorder(new LineBorder(Color.ORANGE, 3));
-
         add(mainPanel);
+
+        // =========================
+        // CONSOLE (em cima)
+        // =========================
+        consoleArea = new JTextArea();
+        consoleArea.setFont(new Font("Monospaced", Font.PLAIN, 11));
+        consoleArea.setEditable(false);
+        consoleArea.setBackground(new Color(255, 243, 204));
+        consoleArea.setForeground(Color.BLACK);
+        consoleArea.setText("=== Console da Máquina Virtual Z80 ===\nAguardando comandos...\n");
+        
+        JScrollPane consoleScroll = new JScrollPane(consoleArea);
+        consoleScroll.setBorder(createTitledBorder("CONSOLE"));
+        consoleScroll.setPreferredSize(new Dimension(880, 120));
+        mainPanel.add(consoleScroll, BorderLayout.NORTH);
 
         // =========================
         // TOPO (REGISTRADORES + FLAGS)
@@ -37,18 +51,16 @@ public class GUI extends JFrame {
         JPanel topPanel = new JPanel(new GridLayout(1, 2, 10, 10));
         topPanel.setOpaque(false);
 
-        // REGISTRADORES
         labelRegs = new JLabel();
         JPanel panelRegs = createBox("REGISTRADORES", labelRegs);
 
-        // FLAGS
         labelFlags = new JLabel();
         JPanel panelFlags = createBox("FLAGS", labelFlags);
 
         topPanel.add(panelRegs);
         topPanel.add(panelFlags);
 
-        mainPanel.add(topPanel, BorderLayout.NORTH);
+        mainPanel.add(topPanel, BorderLayout.CENTER);
 
         // =========================
         // CENTRO (INFO + MEMÓRIA + STACK)
@@ -85,10 +97,10 @@ public class GUI extends JFrame {
         centerPanel.add(memScroll);
         centerPanel.add(stackScroll);
 
-        mainPanel.add(centerPanel, BorderLayout.CENTER);
+        mainPanel.add(centerPanel, BorderLayout.SOUTH);
 
         // =========================
-        // BOTÕES (embaixo)
+        // BOTÕES
         // =========================
         JPanel buttonPanel = new JPanel();
         buttonPanel.setOpaque(false);
@@ -103,53 +115,95 @@ public class GUI extends JFrame {
         buttonPanel.add(btnReset);
         buttonPanel.add(btnLoad);
 
-        mainPanel.add(buttonPanel, BorderLayout.SOUTH);
+        mainPanel.add(buttonPanel, BorderLayout.AFTER_LAST_LINE);
 
         // =========================
-        // AÇÕES
+        // AÇÕES DOS BOTÕES
         // =========================
 
         btnStep.addActionListener(e -> {
-            if (!programLoaded) return;
+            // Usa a referência direta this.cpu (que é efetivamente final)
+            if (!programLoaded) {
+                consoleArea.append("[Aviso] Nenhum programa carregado. Use LOAD primeiro.\n");
+                return;
+            }
             
+            if (this.cpu.halted) {
+                consoleArea.append("[Aviso] CPU está parada (HALT). Use RESET para reiniciar.\n");
+                return;
+            }
+            
+            consoleArea.append("[STEP] Executando instrução em PC = " + hex16(this.cpu.getRegisters().PC) + "\n");
             this.cpu.step();
             updateDisplay();
+            
+            if (this.cpu.halted) {
+                consoleArea.append("[Sistema] Programa finalizado (HALT)\n");
+            }
         });
 
         btnRun.addActionListener(e -> {
-            if (!programLoaded) return;
+            if (!programLoaded) {
+                consoleArea.append("[Aviso] Nenhum programa carregado. Use LOAD primeiro.\n");
+                return;
+            }
+            
+            if (this.cpu.halted) {
+                consoleArea.append("[Aviso] CPU está parada (HALT). Use RESET para reiniciar.\n");
+                return;
+            }
+            
+            consoleArea.append("[RUN] Executando programa...\n");
+            
+            // Cria uma referência final para usar dentro da thread
+            final CPU cpuRef = this.cpu;
             
             new Thread(() -> {
-                while (!cpu.halted) {
-                    cpu.step();
+                int steps = 0;
+                while (!cpuRef.halted) {
+                    cpuRef.step();
+                    steps++;
 
                     try {
-                        Thread.sleep(200); // velocidade
+                        Thread.sleep(100);
                     } catch (InterruptedException ex) {}
 
-                    SwingUtilities.invokeLater(() -> updateDisplay());
+                    final int currentSteps = steps;
+                    SwingUtilities.invokeLater(() -> {
+                        updateDisplay();
+                        if (cpuRef.halted) {
+                            consoleArea.append("[RUN] Programa finalizado após " + currentSteps + " instruções (HALT)\n");
+                        }
+                    });
                 }
             }).start();
         });
 
         btnReset.addActionListener(e -> {
+            // Cria uma nova CPU e atualiza a referência
             this.cpu = new CPU();
+            programLoaded = false;
+            consoleArea.append("[Reset] CPU reiniciada. Registradores zerados.\n");
             updateDisplay();
         });
 
         btnLoad.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser(new File("."));
+            chooser.setDialogTitle("Selecione o arquivo objeto (.obj)");
+            
+            chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                "Arquivos Objeto (*.obj)", "obj"));
+            
             int result = chooser.showOpenDialog(this);
 
             if (result == JFileChooser.APPROVE_OPTION) {
                 File file = chooser.getSelectedFile();
-                System.out.println("Arquivo selecionado: " + file.getAbsolutePath());
+                consoleArea.append("[Loader] Carregando arquivo: " + file.getName() + "\n");
                 ProgramLoader.load(file.getAbsolutePath(), this.cpu.getMemory());
                 this.cpu.getRegisters().PC = 0;
                 this.cpu.halted = false;
-                
                 programLoaded = true;
-                
+                consoleArea.append("[Loader] Programa carregado! PC = 0x0000\n");
                 updateDisplay();
             }
         });
@@ -159,8 +213,9 @@ public class GUI extends JFrame {
     }
 
     // =========================
-    // CRIAR CAIXAS COM TÍTULO
+    // MÉTODOS AUXILIARES
     // =========================
+    
     private JPanel createBox(String title, JLabel content) {
         JPanel panel = new JPanel();
         panel.setLayout(new BorderLayout());
@@ -181,14 +236,10 @@ public class GUI extends JFrame {
         return border;
     }
 
-    // =========================
-    // UPDATE DISPLAY
-    // =========================
     private void updateDisplay() {
-        Registers r = cpu.getRegisters();
+        Registers r = this.cpu.getRegisters();
         
         if (!programLoaded) {
-
             labelOpcode.setText("Opcode atual: (sem programa)");
             labelStatus.setText("STATUS: AGUARDANDO LOAD");
 
@@ -201,9 +252,12 @@ public class GUI extends JFrame {
                 "SP: " + hex16(r.SP) +
                 "</html>"
             );
-
-            return; // 👈 SAI DO MÉTODO AQUI
+            
+            memoryArea.setText("(Nenhum programa carregado)");
+            stackArea.setText("(Nenhum programa carregado)");
+            return;
         } 
+        
         // REGISTRADORES
         labelRegs.setText(
                 "<html>" +
@@ -231,20 +285,18 @@ public class GUI extends JFrame {
         labelPC.setText("PC: " + hex16(r.PC));
 
         if (r.PC >= 0 && r.PC < 65536) {
-            int opcode = cpu.getMemory().read(r.PC);
+            int opcode = this.cpu.getMemory().read(r.PC);
             labelOpcode.setText("Opcode atual: " + hex(opcode));
         } else {
             labelOpcode.setText("Opcode atual: --");
         }
 
-        labelStatus.setText("STATUS: " + (cpu.halted ? "HALTED" : "IDLE"));
+        labelStatus.setText("STATUS: " + (this.cpu.halted ? "HALTED" : "RUNNING"));
 
-        // MEMÓRIA (20 posições)
+        // MEMÓRIA (primeiros 20 bytes)
         StringBuilder mem = new StringBuilder();
         for (int i = 0; i < 20; i++) {
-            if (i >= 0 && i < 6553) {
-                mem.append(String.format("%04X: %02X\n", i, cpu.getMemory().read(i)));
-            }
+            mem.append(String.format("%04X: %02X\n", i, this.cpu.getMemory().read(i)));
         }
         memoryArea.setText(mem.toString());
 
@@ -254,7 +306,7 @@ public class GUI extends JFrame {
         for (int i = 0; i < 10; i++) {
             int addr = sp + i;
             if(addr >= 0 && addr < 65536) {
-            stack.append(String.format("%04X: %02X\n", addr, cpu.getMemory().read(addr)));
+                stack.append(String.format("%04X: %02X\n", addr, this.cpu.getMemory().read(addr)));
             }
         }
         stackArea.setText(stack.toString());

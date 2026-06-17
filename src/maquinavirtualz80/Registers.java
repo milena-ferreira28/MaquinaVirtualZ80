@@ -1,13 +1,5 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package maquinavirtualz80;
 
-/**
- *
- * @author milly
- */
 public class Registers {
     
     public Flags flags;
@@ -36,6 +28,7 @@ public class Registers {
         IY = 0;
         flags.reset();
     }
+    
     
     // REGISTRADORES DE 16 BITS (PARES)
     public int getBC(){
@@ -74,4 +67,5 @@ public class Registers {
         A = (value >> 8) & 0xFF;
         flags.setByte(value & 0xFF);
     }
+    
 }

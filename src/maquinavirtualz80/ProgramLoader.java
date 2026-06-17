@@ -1,17 +1,7 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package maquinavirtualz80;
-
-/**
- *
- * @author milly
- */
 
 import java.io.BufferedReader;
 import java.io.FileReader;
-
 
 public class ProgramLoader {
 
@@ -24,7 +14,6 @@ public class ProgramLoader {
 
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
-
                 if (line.isEmpty()) continue;
 
                 int value = Integer.parseInt(line, 16);

@@ -1,13 +1,5 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package maquinavirtualz80;
 
-/**
- *
- * @author milly
- */
 public class Flags {
     
     private boolean S; // Sign
@@ -64,5 +56,4 @@ public class Flags {
         N = (value & 0b00000010) != 0;
         C = (value & 0b00000001) != 0;
     }
-
 }
