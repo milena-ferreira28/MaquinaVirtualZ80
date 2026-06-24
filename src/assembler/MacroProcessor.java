@@ -264,7 +264,7 @@ public class MacroProcessor {
 
     private void writeFile(String filename, List<String> lines) throws IOException {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(filename))) {
-            writer.write("; Gerado pelo pre-processador de macros — nao editar diretamente");
+            writer.write("; Gerado pelo pre-processador de macros - nao editar diretamente");
             writer.newLine();
             writer.newLine();
             for (String line : lines) {
