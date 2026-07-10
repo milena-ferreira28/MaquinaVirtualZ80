@@ -1,4 +1,4 @@
-; Gerado pelo pre-processador de macros — nao editar diretamente
+; Gerado pelo pre-processador de macros - nao editar diretamente
 
 ; Macros simples: sem parametros e com parametros
 

@@ -7,16 +7,19 @@ public class Assembler {
     private SymbolTable symbolTable;
     private List<String> lines;
     private List<Integer> codeBytes;
+    private List<Integer> relocationTable;
     private int currentAddress;
     private boolean hasErrors;
     private StringBuilder errorLog;
     
     public Assembler() {
-        symbolTable = new SymbolTable();
-        codeBytes = new ArrayList<>();
-        hasErrors = false;
-        errorLog = new StringBuilder();
-    }
+    symbolTable = new SymbolTable();
+    codeBytes = new ArrayList<>();
+    relocationTable = new ArrayList<>();
+
+    hasErrors = false;
+    errorLog = new StringBuilder();
+}
     
     public boolean assemble(String inputFile, String outputFile) {
         try {
@@ -91,6 +94,24 @@ public class Assembler {
                 continue;
             }
             
+            // Diretiva PUBLIC
+
+            if (token.opcode != null &&
+                token.opcode.equalsIgnoreCase("PUBLIC")) {
+
+                symbolTable.addPublic(token.operand1);
+                continue;
+            }
+
+            // Diretiva EXTERN
+
+            if (token.opcode != null &&
+                token.opcode.equalsIgnoreCase("EXTERN")) {
+
+                symbolTable.addExternal(token.operand1);
+                continue;
+            }
+            
             // Se não tem opcode, pular
             if (token.opcode == null) continue;
             
@@ -108,6 +129,7 @@ public class Assembler {
 private void secondPass() {
     currentAddress = 0;
     codeBytes.clear();
+    relocationTable.clear();
     
     for (int i = 0; i < lines.size(); i++) {
         String line = lines.get(i);
@@ -119,6 +141,17 @@ private void secondPass() {
             continue;
         }
         
+        // Processar diretiva PUBLIC
+        if (token.opcode != null &&
+            token.opcode.equalsIgnoreCase("PUBLIC")) {
+            continue;
+        }
+
+        // Processar diretiva EXTERN
+        if (token.opcode != null &&
+            token.opcode.equalsIgnoreCase("EXTERN")) {
+            continue;
+        }
         // Pular linhas sem opcode (só rótulo)
         if (token.opcode == null) continue;
         
@@ -134,9 +167,38 @@ private void secondPass() {
             if (j == 0 && info.hasAddressOperand && token.operand1 != null) {
                 // Se é um rótulo, resolve o endereço
                 int value = symbolTable.getAddress(token.operand1);
-                if (value == -1 && token.operand1.matches("[A-Za-z_][A-Za-z0-9_]*")) {
-                    error("Linha " + (i+1) + ": Rótulo não definido: " + token.operand1);
+                // Caso seja símbolo externo
+                if (value == -1 &&
+                    symbolTable.getExternalSymbols().contains(token.operand1)) {
+
+
+                    // reserva espaço para o linker preencher
+
+                    relocationTable.add(codeBytes.size());
+
+
+                    codeBytes.add(0);
+                    codeBytes.add(0);
+
+
+                    j++;
+
+                }
+
+
+                // Caso seja símbolo realmente inexistente
+                else if (value == -1 &&
+                         token.operand1.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+
+
+                    error(
+                        "Linha " + (i+1)
+                        + ": Rótulo não definido: "
+                        + token.operand1
+                    );
+
                     return;
+
                 } else if (value != -1) {
                     // É rótulo, usa o valor
                     if (info.operandBytes == 1) {
@@ -144,10 +206,13 @@ private void secondPass() {
                         int offset = value - (currentAddress + 2);
                         codeBytes.add(offset & 0xFF);
                     } else {
-                        // JP, CALL - 2 bytes little-endian
-                        codeBytes.add(value & 0xFF);      // low byte
-                        codeBytes.add((value >> 8) & 0xFF); // high byte
-                        j++; // pulou um byte extra
+                        // JP, CALL - 2 bytes little-endian guarda onde começa o endereço de 16 bits
+                        relocationTable.add(codeBytes.size());
+
+                        codeBytes.add(value & 0xFF);
+                        codeBytes.add((value >> 8) & 0xFF);
+
+                        j++;
                     }
                 } else {
                     // É valor imediato numérico
@@ -191,12 +256,43 @@ private void secondPass() {
     }
     
     private void writeObjectFile(String filename) throws IOException {
-        BufferedWriter writer = new BufferedWriter(new FileWriter(filename));
-        for (int b : codeBytes) {
-            writer.write(String.format("%02X\n", b & 0xFF));
-        }
-        writer.close();
+
+    BufferedWriter writer = new BufferedWriter(new FileWriter(filename));
+
+    writer.write("SYMBOLS\n");
+    for (String s : symbolTable.getSymbols().keySet()) {
+        int addr = symbolTable.getAddress(s);
+        writer.write(s + " " + addr + "\n");
     }
+    writer.write("\n");
+    
+    writer.write("PUBLIC\n");
+
+    for (String s : symbolTable.getPublicSymbols()) {
+        int addr = symbolTable.getAddress(s);
+        writer.write(s + " " + addr + "\n");
+    }
+    writer.write("\n");
+
+    writer.write("EXTERN\n");
+    for (String s : symbolTable.getExternalSymbols()) {
+        writer.write(s + "\n");
+    }
+    writer.write("\n");
+    
+     writer.write("RELOC\n");
+    for (Integer pos : relocationTable) {
+        writer.write(pos + "\n");
+    }
+    writer.write("\n");
+    
+    writer.write("CODE\n");
+    for (Integer b : codeBytes) {
+        writer.write(String.format("%02X\n", b));
+    }
+    
+    writer.close();
+}
     
     private void error(String msg) {
         hasErrors = true;

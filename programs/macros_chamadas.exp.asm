@@ -1,4 +1,4 @@
-; Gerado pelo pre-processador de macros — nao editar diretamente
+; Gerado pelo pre-processador de macros - nao editar diretamente
 
 ; Chamadas aninhadas: SOMA chama LOAD internamente
 

@@ -1,4 +1,4 @@
-; Gerado pelo pre-processador de macros — nao editar diretamente
+; Gerado pelo pre-processador de macros - nao editar diretamente
 
 ; Soma 5 + 3 = 8
 

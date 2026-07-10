@@ -1,0 +1,6 @@
+PUBLIC FUNC
+
+ORG $0000
+
+FUNC:
+    HALT

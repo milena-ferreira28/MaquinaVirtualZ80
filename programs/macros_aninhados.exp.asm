@@ -1,4 +1,4 @@
-; Gerado pelo pre-processador de macros — nao editar diretamente
+; Gerado pelo pre-processador de macros - nao editar diretamente
 
 ; Definicao aninhada: GERADOR define DOBRA e a chama internamente
 
